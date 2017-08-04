@@ -13,7 +13,7 @@ import com.typesafe.tools.mima.plugin.MimaKeys.{
 
 resolvers ++= DefaultOptions.resolvers(snapshot = true)
 
-val scala213Version = "2.13.0-M1"
+val scala213Version = "2.13.0-M2"
 
 val specsVersion = "3.9.1"
 val specsBuild = Seq(
