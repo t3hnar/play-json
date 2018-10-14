@@ -108,8 +108,11 @@ trait ConstraintReads {
     Reads[Option[A]](js => JsSuccess(reads.reads(js).asOpt))
 
   def list[A](implicit reads: Reads[A]): Reads[List[A]] = Reads.traversableReads[List, A]
+
   def set[A](implicit reads: Reads[A]): Reads[Set[A]] = Reads.traversableReads[Set, A]
+
   def seq[A](implicit reads: Reads[A]): Reads[Seq[A]] = Reads.traversableReads[Seq, A]
+
   def map[A](implicit reads: Reads[A]): Reads[collection.immutable.Map[String, A]] = Reads.mapReads[A]
 
   /**

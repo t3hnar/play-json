@@ -18,7 +18,7 @@ resolvers ++= DefaultOptions.resolvers(snapshot = true)
 val specsBuild = Def.setting[Seq[ModuleID]] {
   val specsVersion = CrossVersion.partialVersion(scalaVersion.value) match {
     case Some((2, 10)) => "3.9.1"
-    case _ => "4.3.0"
+    case _ => "4.3.2"
   }
 
   Seq("org.specs2" %% "specs2-core" % specsVersion)
@@ -117,8 +117,7 @@ lazy val root = project
 lazy val `play-json` = crossProject(JVMPlatform, JSPlatform).crossType(CrossType.Full)
   .in(file("play-json"))
   .enablePlugins(PlayLibrary, Playdoc)
-  .settings(commonSettings)
-  .settings(playJsonMimaSettings)
+  .settings(commonSettings ++ playJsonMimaSettings)
   .settings(
   mimaBinaryIssueFilters ++= Seq(
       ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityDefaultReads.play$api$libs$json$LowPriorityDefaultReads$_setter_$uriReads_="),

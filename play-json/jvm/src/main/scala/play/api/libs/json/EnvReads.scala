@@ -5,12 +5,32 @@
 package play.api.libs.json
 
 import java.time.format.{ DateTimeFormatter, DateTimeParseException }
-import java.time.temporal.{ ChronoUnit, TemporalUnit, UnsupportedTemporalTypeException, Temporal => JTemporal }
-import java.time.{ Clock, DateTimeException, Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, Period, ZoneId, ZoneOffset, ZonedDateTime, Duration => JDuration }
+import java.time.temporal.{
+  ChronoUnit,
+  TemporalUnit,
+  UnsupportedTemporalTypeException,
+  Temporal => JTemporal
+}
+import java.time.{
+  Clock,
+  DateTimeException,
+  Instant,
+  LocalDate,
+  LocalDateTime,
+  LocalTime,
+  OffsetDateTime,
+  Period,
+  ZoneId,
+  ZoneOffset,
+  ZonedDateTime,
+  Duration => JDuration
+}
+
 import java.util.Locale
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.{ ArrayNode, ObjectNode }
+
 import play.api.libs.json.jackson.JacksonJson
 
 trait EnvReads {
@@ -482,7 +502,7 @@ trait EnvReads {
 
     base.flatMap { baseLocale =>
       for {
-        ats <- (json \ "attributes").validateOpt[Set[String]]
+        ats <- (json \ "attributes").validateOpt[Set[String]](Reads.traversableReads[Set, String])
         kws <- (json \ "keywords").validateOpt[Map[String, String]]
         spt <- (json \ "script").validateOpt[String]
         ext <- (json \ "extension").validateOpt(
