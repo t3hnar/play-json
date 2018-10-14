@@ -662,4 +662,22 @@ class ReadsSpec extends org.specs2.mutable.Specification {
         Reads.javaPeriodYearsReads) must_== JsSuccess(Period.ofYears(5))
     }
   }
+
+  "URL" should {
+    import java.net.URL
+
+    "be read from JsString" in {
+      val strRepr = "https://www.playframework.com/documentation/2.6.x/api/scala/index.html#play.api.libs.json.JsResult"
+
+      JsString(strRepr).validate[URL] mustEqual JsSuccess(new URL(strRepr))
+    }
+
+    "not be read from invalid JsString" in {
+      val strRepr = "*invalid*"
+
+      JsString(strRepr).validate[URL] mustEqual (JsError(List((JsPath, List(
+        JsonValidationError("no protocol: *invalid*")
+      )))))
+    }
+  }
 }

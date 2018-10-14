@@ -4,6 +4,8 @@
 
 package play.api.libs.json
 
+import java.net.URL
+
 import java.time.format.DateTimeFormatter
 import java.time.temporal.Temporal
 import java.time.{ Instant, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, Period, ZoneId, ZoneOffset, ZonedDateTime, Duration => JDuration }
@@ -312,6 +314,12 @@ trait EnvWrites {
    */
   implicit val javaPeriodWrites: Writes[Period] =
     Writes[Period] { d => JsString(d.toString) }
+
+  /**
+   * Serializer for java.net.URL
+   */
+  implicit val urlWrites: Writes[java.net.URL] =
+    implicitly[Writes[String]].contramap[java.net.URL](_.toString)
 
   // TODO: remove joda after 2.6.0
   import org.joda.time.{ DateTime, LocalDate, LocalTime }

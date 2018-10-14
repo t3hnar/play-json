@@ -4,7 +4,7 @@
 
 package play.api.libs.json
 
-import java.net.{ URL, URI }
+import java.net.URI
 
 import scala.annotation.implicitNotFound
 
@@ -539,15 +539,6 @@ trait LowPriorityDefaultReads extends CompatReads with EnvReads {
    */
   implicit def ArrayReads[T: Reads: ClassTag]: Reads[Array[T]] = new Reads[Array[T]] {
     def reads(json: JsValue) = json.validate[List[T]].map(_.toArray)
-  }
-
-  /**
-   * Deserializer for java.net.URL
-   */
-  implicit val urlReads: Reads[URL] = Reads[URL] {
-    _.validate[String].flatMap { repr =>
-      JsResult.fromTry(Try(new URL(repr)))
-    }
   }
 
   /**

@@ -4,6 +4,8 @@
 
 package play.api.libs.json
 
+import java.net.URL
+
 import java.time.format.{ DateTimeFormatter, DateTimeParseException }
 import java.time.temporal.{
   ChronoUnit,
@@ -27,6 +29,8 @@ import java.time.{
 }
 
 import java.util.Locale
+
+import scala.util.Try
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.{ ArrayNode, ObjectNode }
@@ -666,4 +670,13 @@ trait EnvReads {
 
   @deprecated("Include play-json-joda as a dependency and use JodaReads.DefaultJodaLocalTimeReads", "2.6.0")
   val DefaultJodaLocalTimeReads = jodaLocalTimeReads("")
+
+  /**
+   * Deserializer for java.net.URL
+   */
+  implicit val urlReads: Reads[URL] = Reads[URL] {
+    _.validate[String].flatMap { repr =>
+      JsResult.fromTry(Try(new URL(repr)))
+    }
+  }
 }
