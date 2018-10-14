@@ -324,6 +324,18 @@ trait DefaultWrites extends LowPriorityWrites {
 
 sealed trait LowPriorityWrites extends EnvWrites {
   /**
+   * Serializer for java.net.URL
+   */
+  implicit val urlWrites: Writes[java.net.URL] =
+    implicitly[Writes[String]].contramap[java.net.URL](_.toString)
+
+  /**
+   * Serializer for java.net.URI
+   */
+  implicit val uriWrites: Writes[java.net.URI] =
+    implicitly[Writes[String]].contramap[java.net.URI](_.toString)
+
+  /**
    * Serializer for Traversables types.
    */
   implicit def traversableWrites[A: Writes]: Writes[Traversable[A]] = {

@@ -7,6 +7,7 @@ package play.api.libs.json
 import java.math.BigInteger
 
 import java.util.Locale
+import java.net.{ URL, URI }
 
 import org.scalatest._
 
@@ -155,6 +156,38 @@ class ReadsSharedSpec extends WordSpec with MustMatchers {
     "deserialize correctly enum with default names" in {
       JsString("defaultEnum1").validate[EnumWithDefaultNames] mustEqual JsSuccess(defaultEnum1)
       JsString("defaultEnum2").validate[EnumWithDefaultNames] mustEqual JsSuccess(defaultEnum2)
+    }
+  }
+
+  "URL" should {
+    "be read from JsString" in {
+      val strRepr = "https://www.playframework.com/documentation/2.6.x/api/scala/index.html#play.api.libs.json.JsResult"
+
+      JsString(strRepr).validate[URL] mustEqual JsSuccess(new URL(strRepr))
+    }
+
+    "not be read from invalid JsString" in {
+      val strRepr = "*invalid*"
+
+      JsString(strRepr).validate[URL] mustEqual (JsError(List((JsPath, List(
+        JsonValidationError("no protocol: *invalid*")
+      )))))
+    }
+  }
+
+  "URI" should {
+    "be read from JsString" in {
+      val strRepr = "https://www.playframework.com/documentation/2.6.x/api/scala/index.html#play.api.libs.json.JsResult"
+
+      JsString(strRepr).validate[URI] mustEqual JsSuccess(new URI(strRepr))
+    }
+
+    "not be read from invalid JsString" in {
+      val strRepr = " invalid"
+
+      JsString(strRepr).validate[URI] mustEqual (JsError(List((JsPath, List(
+        JsonValidationError("Illegal character in path at index 0:  invalid")
+      )))))
     }
   }
 

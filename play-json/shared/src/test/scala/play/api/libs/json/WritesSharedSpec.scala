@@ -61,18 +61,34 @@ class WritesSharedSpec extends WordSpec with MustMatchers {
     }
   }
 
-  "EnumFormat" should {
+  "Enumeration" should {
     import TestEnums.EnumWithCustomNames._
     import TestEnums.EnumWithDefaultNames._
 
-    "serialize correctly enum with custom names" in {
+    "be written with custom names" in {
       Json.toJson(customEnum1) mustEqual JsString("ENUM1")
       Json.toJson(customEnum2) mustEqual JsString("ENUM2")
     }
 
-    "serialize correctly enum with default names" in {
+    "be written with default names" in {
       Json.toJson(defaultEnum1) mustEqual JsString("defaultEnum1")
       Json.toJson(defaultEnum2) mustEqual JsString("defaultEnum2")
+    }
+  }
+
+  "URL" should {
+    "be written as string" in {
+      val strRepr = "https://www.playframework.com/documentation/2.6.x/api/scala/index.html#play.api.libs.json.JsResult"
+
+      Json.toJson(new java.net.URL(strRepr)) mustEqual JsString(strRepr)
+    }
+  }
+
+  "URI" should {
+    "be written as string" in {
+      val strRepr = "https://www.playframework.com/documentation/2.6.x/api/scala/index.html#play.api.libs.json.JsResult"
+
+      Json.toJson(new java.net.URI(strRepr)) mustEqual JsString(strRepr)
     }
   }
 

@@ -4,11 +4,13 @@
 
 package play.api.libs.json
 
+import java.net.{ URL, URI }
+
 import scala.annotation.implicitNotFound
 
-import scala.util.control
+import scala.util.{ control, Try }
 
-import scala.collection.Seq
+import scala.collection.{ generic, Seq }
 import scala.collection.compat._
 import scala.collection.immutable.Map
 import scala.collection.mutable.Builder
@@ -144,14 +146,16 @@ object Reads extends ConstraintReads with PathReads with DefaultReads with Gener
 
     def map[A, B](m: Reads[A], f: A => B): Reads[B] = m.map(f)
 
-    def apply[A, B](mf: Reads[A => B], ma: Reads[A]): Reads[B] = new Reads[B] { def reads(js: JsValue) = applicativeJsResult(mf.reads(js), ma.reads(js)) }
-
+    def apply[A, B](mf: Reads[A => B], ma: Reads[A]): Reads[B] = new Reads[B] {
+      def reads(js: JsValue): JsResult[B] =
+        applicativeJsResult(mf.reads(js), ma.reads(js))
+    }
   }
 
   implicit def alternative(implicit a: Applicative[Reads]): Alternative[Reads] = new Alternative[Reads] {
     val app = a
     def |[A, B >: A](alt1: Reads[A], alt2: Reads[B]): Reads[B] = new Reads[B] {
-      def reads(js: JsValue) = alt1.reads(js) match {
+      def reads(js: JsValue): JsResult[B] = alt1.reads(js) match {
         case r @ JsSuccess(_, _) => r
         case JsError(es1) => alt2.reads(js) match {
           case r2 @ JsSuccess(_, _) => r2
@@ -160,11 +164,12 @@ object Reads extends ConstraintReads with PathReads with DefaultReads with Gener
       }
     }
 
-    def empty: Reads[Nothing] =
-      new Reads[Nothing] { def reads(js: JsValue) = JsError(Seq()) }
-
+    def empty: Reads[Nothing] = NothingReads
   }
 
+  /**
+   * Returns an instance which uses `f` as [[Reads.reads]] function.
+   */
   def apply[A](f: JsValue => JsResult[A]): Reads[A] =
     new Reads[A] { def reads(json: JsValue) = f(json) }
 
@@ -188,48 +193,9 @@ object Reads extends ConstraintReads with PathReads with DefaultReads with Gener
 }
 
 /**
- * Low priority reads.
- *
- * This exists as a compiler performance optimization, so that the compiler doesn't have to rule them out when
- * DefaultReads provides a simple match.
- *
- * See https://github.com/playframework/playframework/issues/4313 for more details.
- */
-trait LowPriorityDefaultReads extends EnvReads {
-
-  /**
-   * Generic deserializer for collections types.
-   */
-  implicit def traversableReads[F[_], A](implicit bf: Factory[A, F[A]], ra: Reads[A]) = new Reads[F[A]] {
-    def reads(json: JsValue) = json match {
-      case JsArray(ts) =>
-
-        type Errors = Seq[(JsPath, Seq[JsonValidationError])]
-        def locate(e: Errors, idx: Int) = e.map { case (p, valerr) => (JsPath(idx)) ++ p -> valerr }
-
-        ts.iterator.zipWithIndex.foldLeft(Right(Vector.empty): Either[Errors, Vector[A]]) {
-          case (acc, (elt, idx)) => (acc, ra.reads(elt)) match {
-            case (Right(vs), JsSuccess(v, _)) => Right(vs :+ v)
-            case (Right(_), JsError(e)) => Left(locate(e, idx))
-            case (Left(e), _: JsSuccess[_]) => Left(e)
-            case (Left(e1), JsError(e2)) => Left(e1 ++ locate(e2, idx))
-          }
-        }.fold(JsError.apply, { res =>
-          val builder = bf.newBuilder
-          builder.sizeHint(res)
-          builder ++= res
-          JsSuccess(builder.result())
-        })
-      case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsarray"))))
-    }
-  }
-}
-
-/**
  * Default deserializer type classes.
  */
 trait DefaultReads extends LowPriorityDefaultReads {
-  import scala.language.implicitConversions
 
   /**
    * builds a JsErrorObj JsObject
@@ -382,16 +348,17 @@ trait DefaultReads extends LowPriorityDefaultReads {
    *
    * @param enum a `scala.Enumeration`.
    */
-  def enumNameReads[E <: Enumeration](enum: E): Reads[E#Value] = new Reads[E#Value] {
-    def reads(json: JsValue) = json match {
-      case JsString(str) =>
-        enum.values
-          .find(_.toString == str)
-          .map(JsSuccess(_))
-          .getOrElse(JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.validenumvalue")))))
-      case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.enumstring"))))
+  def enumNameReads[E <: Enumeration](enum: E): Reads[E#Value] =
+    new Reads[E#Value] {
+      def reads(json: JsValue): JsResult[E#Value] = json match {
+        case JsString(str) =>
+          enum.values
+            .find(_.toString == str)
+            .map(JsSuccess(_))
+            .getOrElse(JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.validenumvalue")))))
+        case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.enumstring"))))
+      }
     }
-  }
 
   /**
    * Deserializer for Boolean types.
@@ -470,6 +437,51 @@ trait DefaultReads extends LowPriorityDefaultReads {
     }
   }
 
+  /**
+   * Deserializer for java.util.UUID
+   */
+  class UUIDReader(checkValidity: Boolean) extends Reads[java.util.UUID] {
+    import java.util.UUID
+
+    import scala.util.Try
+
+    def check(s: String)(u: UUID): Boolean = (u != null && s == u.toString())
+    def parseUuid(s: String): Option[UUID] = {
+      val uncheckedUuid = Try(UUID.fromString(s)).toOption
+
+      if (checkValidity) {
+        uncheckedUuid filter check(s)
+      } else {
+        uncheckedUuid
+      }
+    }
+
+    def reads(json: JsValue) = json match {
+      case JsString(s) => {
+        parseUuid(s).map(JsSuccess(_)).getOrElse(JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.uuid")))))
+      }
+      case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.uuid"))))
+    }
+  }
+
+  implicit val uuidReads: Reads[java.util.UUID] = new UUIDReader(false)
+
+  private[json] object NothingReads extends Reads[Nothing] {
+    def reads(js: JsValue) = JsError(Seq.empty)
+  }
+}
+
+/**
+ * Low priority reads.
+ *
+ * This exists as a compiler performance optimization, so that the compiler doesn't have to rule them out when
+ * DefaultReads provides a simple match.
+ *
+ * See https://github.com/playframework/playframework/issues/4313 for more details.
+ */
+trait LowPriorityDefaultReads extends EnvReads {
+  import scala.language.implicitConversions
+
   @annotation.tailrec
   private def mapObj[K, V](key: String => JsResult[K], in: List[(String, JsValue)], out: Builder[(K, V), Map[K, V]])(implicit vr: Reads[V]): JsResult[Map[K, V]] = in match {
     case (k, v) :: entries => key(k).flatMap(
@@ -511,16 +523,6 @@ trait DefaultReads extends LowPriorityDefaultReads {
     case _ => JsError("error.expected.jsobject")
   }
 
-  /* TODO: Remove
-  def mapReads[K, V]()(implicit fmtv: Reads[V]): Reads[Map[K, V]] = Reads[Map[K, V]] {
-    case JsObject(fields) =>
-      mapObj[K, V](key, fields.toList, Map.newBuilder)
-
-    case _ => JsError(Seq(JsPath -> Seq(
-      JsonValidationError("error.expected.jsobject"))))
-  }
-   */
-
   /** Deserializer for a `Map[String,V]` */
   implicit def mapReads[V](implicit fmtv: Reads[V]): Reads[Map[String, V]] =
     mapReads[String, V](JsSuccess(_))
@@ -540,31 +542,55 @@ trait DefaultReads extends LowPriorityDefaultReads {
   }
 
   /**
-   * Deserializer for java.util.UUID
+   * Deserializer for java.net.URL
    */
-  class UUIDReader(checkValidity: Boolean) extends Reads[java.util.UUID] {
-    import java.util.UUID
-
-    import scala.util.Try
-
-    def check(s: String)(u: UUID): Boolean = (u != null && s == u.toString())
-    def parseUuid(s: String): Option[UUID] = {
-      val uncheckedUuid = Try(UUID.fromString(s)).toOption
-
-      if (checkValidity) {
-        uncheckedUuid filter check(s)
-      } else {
-        uncheckedUuid
-      }
-    }
-
-    def reads(json: JsValue) = json match {
-      case JsString(s) => {
-        parseUuid(s).map(JsSuccess(_)).getOrElse(JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.uuid")))))
-      }
-      case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.uuid"))))
+  implicit val urlReads: Reads[URL] = Reads[URL] {
+    _.validate[String].flatMap { repr =>
+      JsResult.fromTry(Try(new URL(repr)))
     }
   }
 
-  implicit val uuidReads: Reads[java.util.UUID] = new UUIDReader(false)
+  /**
+   * Deserializer for java.net.URI
+   */
+  implicit val uriReads: Reads[URI] = Reads[URI] {
+    _.validate[String].flatMap { repr =>
+      JsResult.fromTry(Try(new URI(repr)))
+    }
+  }
+
+  /**
+   * Generic deserializer for collections types.
+   */
+  implicit def traversableReads[F[_], A](implicit bf: generic.CanBuildFrom[F[_], A, F[A]], ra: Reads[A]): Reads[F[A]] = new Reads[F[A]] {
+    def reads(json: JsValue): JsResult[F[A]] = json match {
+      case JsArray(ts) => {
+        type Errors = Seq[(JsPath, Seq[JsonValidationError])]
+        def locate(e: Errors, idx: Int) = e.map { case (p, valerr) => (JsPath(idx)) ++ p -> valerr }
+
+        ts.iterator.zipWithIndex.foldLeft(Right(Vector.empty): Either[Errors, Vector[A]]) {
+          case (acc, (elt, idx)) => (acc, ra.reads(elt)) match {
+            case (Right(vs), JsSuccess(v, _)) => Right(vs :+ v)
+            case (Right(_), JsError(e)) => Left(locate(e, idx))
+            case (Left(e), JsSuccess(_, _)) => Left(e)
+            case (Left(e1), JsError(e2)) => Left(e1 ++ locate(e2, idx))
+          }
+        }.fold(JsError.apply, { res =>
+          val builder = bf()
+          builder.sizeHint(res)
+          builder ++= res
+          JsSuccess(builder.result())
+        })
+      }
+
+      case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsarray"))))
+    }
+  }
+
+  // ---
+
+  protected[json] final class FunctionalReads[A](
+    r: JsValue => JsResult[A]) extends Reads[A] {
+    def reads(v: JsValue): JsResult[A] = r(v)
+  }
 }

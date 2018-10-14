@@ -120,7 +120,16 @@ lazy val `play-json` = crossProject(JVMPlatform, JSPlatform).crossType(CrossType
   .settings(commonSettings)
   .settings(playJsonMimaSettings)
   .settings(
-    mimaBinaryIssueFilters ++= Seq(
+  mimaBinaryIssueFilters ++= Seq(
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityDefaultReads.play$api$libs$json$LowPriorityDefaultReads$_setter_$uriReads_="),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityDefaultReads.uriReads"),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityDefaultReads.urlReads"),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityDefaultReads.play$api$libs$json$LowPriorityDefaultReads$_setter_$urlReads_="),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityWrites.play$api$libs$json$LowPriorityWrites$_setter_$urlWrites_="),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityWrites.play$api$libs$json$LowPriorityWrites$_setter_$uriWrites_="),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityWrites.uriWrites"),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.LowPriorityWrites.urlWrites"),
+      ProblemFilters.exclude[ReversedMissingMethodProblem]("play.api.libs.json.DefaultReads.NothingReads"),
       // AbstractFunction1 is in scala.runtime and isn't meant to be used by end users
       ProblemFilters.exclude[MissingTypesProblem]("play.api.libs.json.JsArray$"),
       ProblemFilters.exclude[MissingTypesProblem]("play.api.libs.json.JsObject$"),
